@@ -1,4 +1,4 @@
-package com.evae.type;
+package com.evae.type.request.header;
 
 import java.util.function.BiConsumer;
 

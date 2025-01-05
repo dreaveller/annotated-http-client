@@ -1,7 +1,10 @@
 package com.evae;
 
 import com.evae.definition.HttpMethodDefinition;
-import com.evae.type.HttpRequestHeader;
+import com.evae.type.request.body.HttpRequestBody;
+import com.evae.type.request.header.HttpRequestHeader;
+import com.evae.type.HttpRequestQuery;
+import com.evae.type.request.header.HttpRequestHeaderImpl;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -14,8 +17,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
@@ -26,6 +27,8 @@ public class HttpClientProcessor {
     public static Object invoke(HttpMethodDefinition definition, Method method, Object[] args) throws URISyntaxException, IOException, InterruptedException {
         HttpRequestHeader header = null;
         String content = null;
+        HttpRequestQuery query = null;
+        HttpRequestBody<?> body = null;
 
         if (args == null) {
             return invoke(definition, method, header, content);
@@ -34,6 +37,10 @@ public class HttpClientProcessor {
                 header = (HttpRequestHeader) args[0];
             } else if (args[0] instanceof String) {
                 content = (String) args[0];
+            } else if (args[0] instanceof HttpRequestQuery) {
+                query = (HttpRequestQuery) args[0];
+            } else if (args[0] instanceof HttpRequestBody<?>) {
+                body = (HttpRequestBody<?>) args[0];
             }
             return invoke(definition, method, header, content);
         } else {
@@ -45,6 +52,34 @@ public class HttpClientProcessor {
             }
             return invoke(definition, method, header, content);
         }
+    }
+
+    public static Object invoke2(HttpMethodDefinition definition, Method method, Object[] args) throws URISyntaxException, IOException, InterruptedException {
+        HttpRequestHeader header = null;
+        HttpRequestQuery query = null;
+        HttpRequestBody<?> body = null;
+
+        if (args == null) {
+            return invoke(definition, method, header, (String) body.getBody());
+        } else if (args.length > 0) {
+            for (Object arg : args) {
+                if (arg instanceof HttpRequestHeader) {
+                    header = (HttpRequestHeader) arg;
+                } else if (arg instanceof HttpRequestQuery) {
+                    query = (HttpRequestQuery) arg;
+                } else if (arg instanceof HttpRequestBody<?>) {
+                    body = (HttpRequestBody<?>) arg;
+                }
+            }
+            for (Object arg : args) {
+                if (arg instanceof String) {
+                    if (header == null) {
+                        header = new HttpRequestHeaderImpl();
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     public static Object invoke(HttpMethodDefinition definition, Method method, HttpRequestHeader header, String content) throws URISyntaxException, IOException, InterruptedException {
