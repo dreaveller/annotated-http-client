@@ -10,7 +10,7 @@ public class HttpClientProxy implements InvocationHandler {
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         if (method.isDefault()) {
-            return method.invoke(proxy, args);
+            throw new IllegalStateException("default implementation is not supported");
         } else {
             return HttpClientProcessor.invoke(new MethodSignature(method), args);
         }
