@@ -16,4 +16,5 @@ import java.lang.annotation.Target;
 public @interface HttpMethod {
     String path() default "";
     String method() default "GET";
+    int timeout() default 0;
 }

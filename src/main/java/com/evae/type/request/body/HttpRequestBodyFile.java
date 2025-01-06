@@ -2,7 +2,7 @@ package com.evae.type.request.body;
 
 import java.io.File;
 
-public class HttpRequestContentFile implements HttpRequestBody<File> {
+public class HttpRequestBodyFile implements HttpRequestBody<File> {
 
     private File body;
 

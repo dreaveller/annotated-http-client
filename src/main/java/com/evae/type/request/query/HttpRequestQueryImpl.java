@@ -1,4 +1,4 @@
-package com.evae.type;
+package com.evae.type.request.query;
 
 import java.util.Map;
 

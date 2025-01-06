@@ -1,13 +1,11 @@
 package com.evae;
 
-import com.evae.definition.HttpMethodDefinition;
+import com.evae.definition.MethodSignature;
 import com.evae.type.request.body.HttpRequestBody;
 import com.evae.type.request.header.HttpRequestHeader;
-import com.evae.type.HttpRequestQuery;
-import com.evae.type.request.header.HttpRequestHeaderImpl;
+import com.evae.type.request.query.HttpRequestQuery;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.net.URI;
@@ -24,14 +22,14 @@ public class HttpClientProcessor {
 
     private static final HttpClient httpClient = HttpClient.newHttpClient();
 
-    public static Object invoke(HttpMethodDefinition definition, Method method, Object[] args) throws URISyntaxException, IOException, InterruptedException {
+    public static Object invoke(MethodSignature methodSignature, Object[] args) throws URISyntaxException, IOException, InterruptedException {
         HttpRequestHeader header = null;
         String content = null;
         HttpRequestQuery query = null;
         HttpRequestBody<?> body = null;
 
         if (args == null) {
-            return invoke(definition, method, header, content);
+            return invoke(methodSignature, header, content);
         } else if (args.length == 1) {
             if (args[0] instanceof HttpRequestHeader) {
                 header = (HttpRequestHeader) args[0];
@@ -42,7 +40,7 @@ public class HttpClientProcessor {
             } else if (args[0] instanceof HttpRequestBody<?>) {
                 body = (HttpRequestBody<?>) args[0];
             }
-            return invoke(definition, method, header, content);
+            return invoke(methodSignature, header, content);
         } else {
             if (args[0] instanceof HttpRequestHeader) {
                 header = (HttpRequestHeader) args[0];
@@ -50,41 +48,43 @@ public class HttpClientProcessor {
             if (args[1] instanceof String) {
                 content = (String) args[1];
             }
-            return invoke(definition, method, header, content);
+            return invoke(methodSignature, header, content);
         }
     }
 
-    public static Object invoke2(HttpMethodDefinition definition, Method method, Object[] args) throws URISyntaxException, IOException, InterruptedException {
+    public static Object invoke2(MethodSignature methodSignature, Object[] args) throws URISyntaxException, IOException, InterruptedException {
         HttpRequestHeader header = null;
+        String content = null;
         HttpRequestQuery query = null;
         HttpRequestBody<?> body = null;
 
         if (args == null) {
-            return invoke(definition, method, header, (String) body.getBody());
-        } else if (args.length > 0) {
-            for (Object arg : args) {
-                if (arg instanceof HttpRequestHeader) {
-                    header = (HttpRequestHeader) arg;
-                } else if (arg instanceof HttpRequestQuery) {
-                    query = (HttpRequestQuery) arg;
-                } else if (arg instanceof HttpRequestBody<?>) {
-                    body = (HttpRequestBody<?>) arg;
-                }
+            return invoke(methodSignature, header, content);
+        } else if (args.length == 1) {
+            if (args[0] instanceof HttpRequestHeader) {
+                header = (HttpRequestHeader) args[0];
+            } else if (args[0] instanceof String) {
+                content = (String) args[0];
+            } else if (args[0] instanceof HttpRequestQuery) {
+                query = (HttpRequestQuery) args[0];
+            } else if (args[0] instanceof HttpRequestBody<?>) {
+                body = (HttpRequestBody<?>) args[0];
             }
-            for (Object arg : args) {
-                if (arg instanceof String) {
-                    if (header == null) {
-                        header = new HttpRequestHeaderImpl();
-                    }
-                }
+            return invoke(methodSignature, header, content);
+        } else {
+            if (args[0] instanceof HttpRequestHeader) {
+                header = (HttpRequestHeader) args[0];
             }
+            if (args[1] instanceof String) {
+                content = (String) args[1];
+            }
+            return invoke(methodSignature, header, content);
         }
-        return null;
     }
 
-    public static Object invoke(HttpMethodDefinition definition, Method method, HttpRequestHeader header, String content) throws URISyntaxException, IOException, InterruptedException {
+    public static Object invoke(MethodSignature methodSignature, HttpRequestHeader header, String content) throws URISyntaxException, IOException, InterruptedException {
 
-        if (method.getGenericReturnType() instanceof ParameterizedType type) {
+        if (methodSignature.getGenericReturnType() instanceof ParameterizedType type) {
             if (!Future.class.isAssignableFrom((Class<?>) type.getRawType())) {
                 throw new IllegalStateException("Return type must be Future");
             }
@@ -93,38 +93,38 @@ public class HttpClientProcessor {
                 throw new IllegalStateException("Generic type must be Class");
             }
             if (String.class.isAssignableFrom((Class<?>) actualTypeArgument)) {
-                CompletableFuture<HttpResponse<String>> responseFuture = processHttpAsync(definition, HttpResponse.BodyHandlers.ofString(), header, content);
+                CompletableFuture<HttpResponse<String>> responseFuture = processHttpAsync(methodSignature, HttpResponse.BodyHandlers.ofString(), header, content);
                 return responseFuture.thenApply(HttpResponse::body);
             } else {
-                CompletableFuture<HttpResponse<byte[]>> responseFuture = processHttpAsync(definition, HttpResponse.BodyHandlers.ofByteArray(), header, content);
+                CompletableFuture<HttpResponse<byte[]>> responseFuture = processHttpAsync(methodSignature, HttpResponse.BodyHandlers.ofByteArray(), header, content);
                 return responseFuture.thenApply(HttpResponse::body);
             }
         } else {
-            if (String.class.isAssignableFrom(method.getReturnType())) {
-                HttpResponse<String> response = processHttp(definition, HttpResponse.BodyHandlers.ofString(), header, content);
+            if (String.class.isAssignableFrom(methodSignature.getReturnType())) {
+                HttpResponse<String> response = processHttp(methodSignature, HttpResponse.BodyHandlers.ofString(), header, content);
                 return response.body();
             } else {
-                HttpResponse<byte[]> response = processHttp(definition, HttpResponse.BodyHandlers.ofByteArray(),header, content);
+                HttpResponse<byte[]> response = processHttp(methodSignature, HttpResponse.BodyHandlers.ofByteArray(),header, content);
                 return response.body();
             }
         }
 
     }
 
-    private static <T> HttpResponse<T> processHttp(HttpMethodDefinition definition, HttpResponse.BodyHandler<T> bodyHandler, HttpRequestHeader header, String content) throws URISyntaxException, IOException, InterruptedException {
-        HttpRequest request = buildRequest(definition, header, content);
+    private static <T> HttpResponse<T> processHttp(MethodSignature methodSignature, HttpResponse.BodyHandler<T> bodyHandler, HttpRequestHeader header, String content) throws URISyntaxException, IOException, InterruptedException {
+        HttpRequest request = buildRequest(methodSignature, header, content);
         return httpClient.send(request, bodyHandler);
     }
 
-    private static <T> CompletableFuture<HttpResponse<T>> processHttpAsync(HttpMethodDefinition definition, HttpResponse.BodyHandler<T> bodyHandler, HttpRequestHeader header, String content) throws URISyntaxException {
-        HttpRequest request = buildRequest(definition, header, content);
+    private static <T> CompletableFuture<HttpResponse<T>> processHttpAsync(MethodSignature methodSignature, HttpResponse.BodyHandler<T> bodyHandler, HttpRequestHeader header, String content) throws URISyntaxException {
+        HttpRequest request = buildRequest(methodSignature, header, content);
         return httpClient.sendAsync(request, bodyHandler);
     }
 
-    private static HttpRequest buildRequest(HttpMethodDefinition definition, HttpRequestHeader header, String content) throws URISyntaxException {
+    private static HttpRequest buildRequest(MethodSignature methodSignature, HttpRequestHeader header, String content) throws URISyntaxException {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(new URI(definition.url))
-                .method(definition.method, content != null ? HttpRequest.BodyPublishers.ofString(content) : HttpRequest.BodyPublishers.noBody())
+                .uri(new URI(methodSignature.getUrl()))
+                .method(methodSignature.getMethod(), content != null ? HttpRequest.BodyPublishers.ofString(content) : HttpRequest.BodyPublishers.noBody())
                 .timeout(Duration.of(10000, ChronoUnit.MILLIS));
         if (header != null) {
             header.forEach(builder::header);
